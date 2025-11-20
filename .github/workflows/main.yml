@@ -1,19 +1,38 @@
 name: Scan code with Snyk
 on: push
+
 jobs:
   security:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
-      - name: Run Snyk to check for vulnerabilities
+
+      # Dependency Scan + SARIF
+      - name: Snyk Dependency Scan
         uses: snyk/actions/node@master
-        continue-on-error: true # To make sure that SARIF upload gets called
+        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           command: test
-          args: --sarif-file-output=snyk.sarif --all-projects
-      - name: Upload result to GitHub Code Scanning
+          args: --sarif-file-output=snyk-deps.sarif --all-projects
+
+      # Snyk Code Scan (SAST)
+      - name: Snyk Code Scan (SAST)
+        run: |
+          npm install -g snyk
+          snyk code test --sarif-file-output=snyk-code.sarif
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        continue-on-error: true
+
+      # Upload both SARIFs
+      - name: Upload SARIF results
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: snyk.sarif
+          sarif_file: snyk-deps.sarif
+
+      - name: Upload Snyk Code SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-code.sarif
